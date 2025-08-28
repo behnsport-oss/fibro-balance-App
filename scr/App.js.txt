@@ -1,0 +1,302 @@
+import { useState, useMemo, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Moon, Sun, Info, Trash2, Plus, Minus } from 'lucide-react';
+
+export default function App() {
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [entries, setEntries] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [rating, setRating] = useState(5);
+  const [note, setNote] = useState('');
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Load entries from local storage on initial render
+  useEffect(() => {
+    const storedEntries = localStorage.getItem('fibroBalanceEntries');
+    if (storedEntries) {
+      setEntries(JSON.parse(storedEntries));
+    }
+  }, []);
+
+  // Save entries to local storage whenever they change
+  useEffect(() => {
+    localStorage.setItem('fibroBalanceEntries', JSON.stringify(entries));
+  }, [entries]);
+
+  // Update rating and note when selected date changes to reflect existing entry
+  useEffect(() => {
+    const entry = entries.find(e => e.date === selectedDate);
+    if (entry) {
+      setRating(entry.rating);
+      setNote(entry.note || '');
+    } else {
+      setRating(5);
+      setNote('');
+    }
+  }, [selectedDate, entries]);
+
+  const handleDateChange = (event) => {
+    setSelectedDate(event.target.value);
+  };
+
+  const handleRatingChange = (newRating) => {
+    setRating(newRating);
+  };
+  
+  const handleNoteChange = (event) => {
+    setNote(event.target.value);
+  };
+
+  const handleSaveRating = () => {
+    const existingEntryIndex = entries.findIndex(e => e.date === selectedDate);
+    const newEntries = [...entries];
+
+    if (existingEntryIndex !== -1) {
+      // Update existing entry
+      newEntries[existingEntryIndex].rating = rating;
+      newEntries[existingEntryIndex].note = note;
+    } else {
+      // Add a new entry
+      newEntries.push({ date: selectedDate, rating: rating, note: note });
+    }
+    setEntries(newEntries);
+  };
+  
+  const handleDeleteRating = () => {
+    setShowConfirmModal(true); // Show confirmation modal
+  };
+
+  const handleConfirmDelete = () => {
+    setEntries(entries.filter(e => e.date !== selectedDate));
+    setRating(5); // Reset rating after deletion
+    setNote('');
+    setShowConfirmModal(false); // Hide the modal
+  };
+
+  const handleCancelDelete = () => {
+    setShowConfirmModal(false); // Hide the modal without deleting
+  };
+
+  // Sort entries for the chart
+  const chartData = useMemo(() => {
+    const sortedEntries = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+    return sortedEntries.map(entry => ({
+      date: entry.date,
+      rating: entry.rating,
+      note: entry.note || ''
+    }));
+  }, [entries]);
+
+  const currentEntry = useMemo(() => {
+    return entries.find(entry => entry.date === selectedDate);
+  }, [entries, selectedDate]);
+
+  const containerClasses = `min-h-screen flex flex-col items-center p-6 transition-colors duration-500 font-inter ${isDarkMode ? 'bg-zinc-950 text-white' : 'bg-gray-100 text-zinc-900'}`;
+  const cardClasses = `w-full max-w-2xl bg-white/5 backdrop-blur-lg border border-gray-200/10 shadow-xl rounded-2xl p-6 md:p-8 space-y-8 transition-colors duration-500 ${isDarkMode ? 'border-gray-800' : 'bg-white border-gray-200'}`;
+  const iconClasses = `cursor-pointer transition-transform transform hover:scale-110`;
+  const buttonClasses = `w-full py-3 rounded-lg font-bold text-center transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2`;
+  const inputClasses = `w-full rounded-lg px-4 py-3 bg-white/10 border-2 border-transparent focus:border-indigo-500 focus:outline-none transition-colors duration-300 ${isDarkMode ? 'text-white' : 'text-zinc-900'}`;
+  const textareaClasses = `w-full h-24 rounded-lg px-4 py-3 bg-white/10 border-2 border-transparent focus:border-indigo-500 focus:outline-none transition-colors duration-300 resize-none ${isDarkMode ? 'text-white' : 'text-zinc-900'}`;
+
+  // Custom Tick component for the LineChart XAxis to prevent label overlap.
+  const CustomXAxisTick = ({ x, y, payload }) => {
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={0}
+          dy={16}
+          textAnchor="middle"
+          fill={isDarkMode ? '#a1a1aa' : '#52525b'}
+          className="text-xs"
+        >
+          {payload.value}
+        </text>
+      </g>
+    );
+  };
+  
+  // Custom Tooltip component to display date, rating, and note.
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const entry = entries.find(e => e.date === label);
+      return (
+        <div className={`p-4 rounded-lg shadow-lg border ${isDarkMode ? 'bg-zinc-800 border-zinc-700 text-white' : 'bg-white border-gray-300 text-zinc-900'}`}>
+          <p className="font-bold">{`Datum: ${label}`}</p>
+          <p className="text-sm">{`Bewertung: ${payload[0].value}`}</p>
+          {entry?.note && <p className="text-xs italic mt-2">{`Notiz: ${entry.note}`}</p>}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className={containerClasses}>
+      {/* Header and theme toggle */}
+      <header className="w-full max-w-2xl flex justify-between items-center mb-8">
+        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Fibro Balance</h1>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setShowInfoModal(true)}
+            className="p-2 rounded-full transition-colors hover:bg-white/10"
+            aria-label="Information"
+          >
+            <Info className={iconClasses} size={24} />
+          </button>
+          <button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className="p-2 rounded-full transition-colors hover:bg-white/10"
+            aria-label="Toggle dark mode"
+          >
+            {isDarkMode ? <Sun className={iconClasses} size={24} /> : <Moon className={iconClasses} size={24} />}
+          </button>
+        </div>
+      </header>
+
+      {/* Main card */}
+      <main className={cardClasses}>
+        {/* Rating and note input section */}
+        <section className="space-y-4 text-center">
+          <h2 className="text-xl md:text-2xl font-bold">Wie fühlst du dich heute?</h2>
+          <p className="text-sm md:text-base opacity-70">Bewerte dein Wohlbefinden auf einer Skala von 1 (schlecht) bis 10 (sehr gut) und füge eine Notiz hinzu.</p>
+
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={handleDateChange}
+            className={inputClasses}
+          />
+          
+          <div className="flex items-center justify-center space-x-4 py-4">
+            <button
+              onClick={() => handleRatingChange(Math.max(1, rating - 1))}
+              className="p-3 bg-red-500/80 hover:bg-red-600/90 text-white rounded-full transition-all duration-300"
+              aria-label="Decrease rating"
+            >
+              <Minus size={24} />
+            </button>
+            <span className="text-5xl md:text-6xl font-extrabold w-20 text-center">{rating}</span>
+            <button
+              onClick={() => handleRatingChange(Math.min(10, rating + 1))}
+              className="p-3 bg-green-500/80 hover:bg-green-600/90 text-white rounded-full transition-all duration-300"
+              aria-label="Increase rating"
+            >
+              <Plus size={24} />
+            </button>
+          </div>
+          
+          <textarea
+            value={note}
+            onChange={handleNoteChange}
+            placeholder="Füge hier eine Notiz hinzu..."
+            className={textareaClasses}
+          ></textarea>
+
+
+          <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mt-6">
+            <button
+              onClick={handleSaveRating}
+              className={`${buttonClasses} bg-indigo-600 text-white hover:bg-indigo-700`}
+            >
+              {currentEntry ? 'Bewertung aktualisieren' : 'Bewertung speichern'}
+            </button>
+            <button
+              onClick={handleDeleteRating}
+              className={`${buttonClasses} bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed`}
+              disabled={!currentEntry}
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <Trash2 size={20} />
+                <span>Bewertung löschen</span>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        {/* Chart section */}
+        <section className="space-y-4 pt-8">
+          <h2 className="text-xl md:text-2xl font-bold text-center">Dein Fortschritt</h2>
+          <div className="w-full h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#3f3f46" : "#e5e7eb"} />
+                <XAxis
+                  dataKey="date"
+                  stroke={isDarkMode ? '#a1a1aa' : '#52525b'}
+                  tick={<CustomXAxisTick />}
+                  padding={{ left: 20, right: 20 }}
+                  interval="preserveStart"
+                />
+                <YAxis
+                  type="number"
+                  domain={[1, 10]}
+                  stroke={isDarkMode ? '#a1a1aa' : '#52525b'}
+                  tickFormatter={(value) => value.toFixed(0)}
+                />
+                <Tooltip
+                  content={CustomTooltip}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="rating"
+                  stroke="#8b5cf6"
+                  strokeWidth={3}
+                  activeDot={{ r: 8 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      </main>
+
+      {/* Info Modal */}
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 transition-opacity duration-300">
+          <div className={`p-8 rounded-2xl w-full max-w-md ${isDarkMode ? 'bg-zinc-800 text-white' : 'bg-white text-zinc-900'}`}>
+            <h3 className="text-2xl font-bold mb-4">Über Fibro Balance</h3>
+            <p className="mb-4">
+              Fibro Balance wurde entwickelt, um Menschen mit Fibromyalgie zu helfen, ihr tägliches Wohlbefinden zu verfolgen. Es ist ein einfaches Werkzeug, um Muster und Auslöser zu identifizieren.
+            </p>
+            <p className="mb-4">
+              Die App speichert deine Daten **nur in deinem Browser**, sie werden nicht an einen Server gesendet. Wenn du den Browser-Cache löschst, werden deine Daten gelöscht.
+            </p>
+            <button
+              onClick={() => setShowInfoModal(false)}
+              className="mt-4 w-full py-2 bg-indigo-600 text-white rounded-lg transition-colors hover:bg-indigo-700"
+            >
+              Schließen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 transition-opacity duration-300">
+          <div className={`p-8 rounded-2xl w-full max-w-sm text-center ${isDarkMode ? 'bg-zinc-800 text-white' : 'bg-white text-zinc-900'}`}>
+            <h3 className="text-xl font-bold mb-4">Wirklich löschen?</h3>
+            <p className="mb-6">
+              Möchtest du diese Bewertung wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+            </p>
+            <div className="flex justify-around space-x-4">
+              <button
+                onClick={handleConfirmDelete}
+                className="py-2 w-1/2 bg-red-600 text-white rounded-lg transition-colors hover:bg-red-700"
+              >
+                Löschen
+              </button>
+              <button
+                onClick={handleCancelDelete}
+                className="py-2 w-1/2 bg-gray-500 text-white rounded-lg transition-colors hover:bg-gray-600"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
