@@ -101,6 +101,7 @@ export default function FibroBalanceApp() {
 
   // --- Löffel (Energie) ---
   const [spoons, setSpoons] = useState({ date: todayISO(), total: 10, used: 0 });
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // --- Daten aus dem LocalStorage laden ---
   useEffect(() => {
@@ -187,14 +188,16 @@ export default function FibroBalanceApp() {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const resetAll = () => {
-    if (!confirm("Alle Daten wirklich löschen?")) return;
+  
+  const resetAll = () => setShowConfirm(true);
+  const confirmReset = (confirm) => {
+    setShowConfirm(false);
+    if (!confirm) return;
     setEntries([]);
     setSpoons({ date: todayISO(), total: 10, used: 0 });
     localStorage.removeItem(STORAGE_KEY);
   };
-
+  
   const tipOfDay = DAILY_TIPS[tipsIndex];
 
   return (
@@ -206,7 +209,6 @@ export default function FibroBalanceApp() {
           <span className="ml-auto text-sm text-slate-500">Dein sanfter Fibromyalgie-Begleiter</span>
         </div>
       </header>
-
       <main className="max-w-5xl mx-auto px-4 py-6 grid gap-6">
         {/* Tabs */}
         <nav className="flex gap-2 flex-wrap">
@@ -426,6 +428,31 @@ export default function FibroBalanceApp() {
           </section>
         )}
       </main>
+      
+      {showConfirm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+          <div className="p-6 bg-white rounded-lg shadow-xl m-4 max-w-sm w-full">
+            <h3 className="font-semibold mb-2">Daten wirklich löschen?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Dies kann nicht rückgängig gemacht werden. Sind Sie sicher, dass Sie alle Ihre Daten löschen möchten?
+            </p>
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => confirmReset(false)}
+                className="px-4 py-2 rounded-lg text-gray-700 bg-gray-200 hover:bg-gray-300 transition"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={() => confirmReset(true)}
+                className="px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 transition"
+              >
+                Löschen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .btn-primary { @apply inline-flex items-center px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-sm; }
@@ -496,4 +523,3 @@ function Input({ label, type = "text", value, onChange }) {
     </div>
   );
 }
-
