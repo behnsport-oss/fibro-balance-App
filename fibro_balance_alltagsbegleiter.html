@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fibro Balance Alltagsbegleiter</title>
+    <!-- Tailwind CSS CDN for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .card {
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1.5rem;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px; /* Fully rounded buttons */
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .symptom-checkbox {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border: 1px solid;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        /* Light Mode */
+        body.light {
+            background-image: linear-gradient(135deg, #f0f9ff, #b8e9f5);
+            color: #333;
+        }
+        .light .container {
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .light .card {
+            background-color: #f7faff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .light .symptom-checkbox {
+            background-color: #ffffff;
+            border-color: #a8d8e0;
+        }
+        .light .symptom-checkbox.checked {
+            background-color: #4ac7c7;
+            border-color: #2e9b9b;
+            color: #fff;
+        }
+        .light .btn-primary {
+            background-color: #4ac7c7;
+            color: #fff;
+        }
+        .light .btn-primary:hover {
+            background-color: #2e9b9b;
+        }
+        .light .btn-secondary {
+            background-color: #e2e8f0;
+            color: #4b5563;
+        }
+        .light .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+        .light .insights-box {
+            background-color: #e0f2f1;
+            color: #0f766e;
+        }
+          
+        /* Dark Mode */
+        body.dark {
+            background-image: linear-gradient(135deg, #011f26, #004d60);
+            color: #e2e8f0;
+        }
+        .dark .container {
+            background-color: #003340;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .dark .card {
+            background-color: #004d60;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .dark .symptom-checkbox {
+            background-color: #003340;
+            border-color: #4ac7c7;
+            color: #e2f8ff;
+        }
+        .dark .symptom-checkbox.checked {
+            background-color: #4ac7c7;
+            border-color: #2e9b9b;
+            color: #011f26;
+        }
+        .dark .btn-primary {
+            background-color: #4ac7c7;
+            color: #fff;
+        }
+        .dark .btn-primary:hover {
+            background-color: #2e9b9b;
+        }
+        .dark .btn-secondary {
+            background-color: #2d3748;
+            color: #cbd5e1;
+        }
+        .dark .btn-secondary:hover {
+            background-color: #4a5568;
+        }
+        .dark .insights-box {
+            background-color: #006666;
+            color: #e2f8ff;
+        }
+        /* Toggle Button */
+        #themeToggle {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+    </style>
+    <!-- Firebase SDKs for a full-featured application -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, orderBy, query, limit, setDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by the canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId;
+
+        // Function to initialize Firebase and authenticate
+        async function initializeFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        document.getElementById('userIdDisplay').textContent = userId;
+                        // Fetch initial data after authentication
+                        fetchData();
+                    }
+                });
+
+                console.log("Firebase initialisiert und authentifiziert.");
+            } catch (error) {
+                console.error("Fehler bei der Firebase-Initialisierung:", error);
+            }
+        }
+
+        // --- Firebase Functions ---
+        window.logData = async function() {
+            const spoonsInput = document.getElementById('spoons').value;
+            const symptoms = window.dailyData.symptoms;
+
+            if (symptoms.length === 0 || !spoonsInput) {
+                window.showMessage('Bitte wähle mindestens ein Symptom aus und gib deinen Löffelverbrauch an, um deine Daten zu speichern.');
+                return;
+            }
+
+            const today = new Date().toISOString().slice(0, 10);
+            const docRef = doc(db, `artifacts/${appId}/users/${userId}/daily_logs`, today);
+
+            try {
+                await setDoc(docRef, {
+                    symptoms: symptoms,
+                    spoons: parseInt(spoonsInput),
+                    timestamp: new Date()
+                }, { merge: true });
+                window.showMessage('Deine Daten wurden erfolgreich gespeichert!');
+            } catch (error) {
+                console.error("Fehler beim Speichern der Daten: ", error);
+                window.showMessage('Fehler beim Speichern deiner Daten.');
+            }
+        };
+
+        window.fetchData = function() {
+            const logList = document.getElementById('logList');
+            const logsRef = collection(db, `artifacts/${appId}/users/${userId}/daily_logs`);
+            const q = query(logsRef, orderBy("timestamp", "desc"), limit(7));
+
+            onSnapshot(q, (snapshot) => {
+                let logHtml = '';
+                if (snapshot.empty) {
+                    logHtml = '<p class="text-sm text-center">Noch keine Einträge vorhanden.</p>';
+                } else {
+                    snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        const date = new Date(data.timestamp.seconds * 1000).toLocaleDateString('de-DE');
+                        logHtml += `
+                            <li class="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg shadow-sm">
+                                <h4 class="font-semibold">${date}</h4>
+                                <p class="text-sm">Symptome: ${data.symptoms.join(', ')}</p>
+                                <p class="text-sm">Löffel: ${data.spoons}</p>
+                            </li>
+                        `;
+                    });
+                }
+                logList.innerHTML = `<ul class="space-y-2">${logHtml}</ul>`;
+            });
+        };
+        
+        window.initializeFirebase = initializeFirebase;
+    </script>
+</head>
+<body class="light">
+
+    <div id="themeToggle" onclick="toggleTheme()">☀️</div>
+
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center mb-2">Fibro Balance Alltagsbegleiter</h1>
+        <p class="text-center text-sm mb-8">Dein tägliches Tool für Achtsamkeit und Energieverwaltung.</p>
+        <p class="text-xs text-center text-gray-500 mb-4">Nutzer-ID: <span id="userIdDisplay"></span></p>
+
+        <!-- Willkommens-Sektion -->
+        <div class="card bg-gray-50 dark:bg-gray-700">
+            <h2 class="text-2xl font-semibold mb-2">Willkommen</h2>
+            <p class="text-sm mb-4">Fibromyalgie ist eine Krankheit, bei der die Symptome oft unsichtbar sind und die Energie von Tag zu Tag stark schwanken kann. Dieser Begleiter hilft dir, deine tägliche Energie (deine "Löffel") zu verwalten und Muster in deinen Symptomen zu erkennen. Du bist nicht allein.</p>
+            <p class="text-sm font-semibold text-right">Beginne, indem du deine heutigen Symptome und Löffel notierst.</p>
+        </div>
+
+        <!-- Symptom- und Löffel-Tracking-Bereich -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4">Dein Tag heute</h2>
+            <div class="mb-4">
+                <label class="block font-medium mb-2">Welche Symptome spürst du heute?</label>
+                <div class="flex flex-wrap gap-2" id="symptomCheckboxes">
+                    <!-- Checkboxes will be generated here -->
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <div class="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm mb-2">
+                    <p>Die Löffeltheorie erklärt, dass deine Energie begrenzt ist. Jeder **Löffel** steht für eine Einheit Energie, die du verbrauchst.</p>
+                    <p class="mt-2">Eine niedrige Zahl (z.B. **1** oder **2**) ist gut. Eine hohe Zahl bedeutet, dass du viel Energie verbraucht hast und vielleicht eine Pause brauchst.</p>
+                </div>
+                <label for="spoons" class="block font-medium mb-2">Wie viele Löffel hast du heute verbraucht?</label>
+                <input type="number" id="spoons" min="0" placeholder="Z. B. 6"
+                    class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow">
+            </div>
+
+            <button onclick="logData()" class="btn w-full btn-primary">Daten speichern</button>
+        </div>
+
+        <!-- KI-gesteuerte Einblicke -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4">Intelligente Einblicke</h2>
+            <p class="text-sm mb-4">Basierend auf deinen Daten erstellt die KI eine personalisierte Zusammenfassung deines Tages.</p>
+            <button onclick="generateInsights()" class="btn w-full btn-primary">Einblicke erstellen</button>
+            <div id="insightsOutput" class="mt-4 p-4 rounded-lg insights-box hidden"></div>
+        </div>
+
+        <!-- Tagebuch-Sektion -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4">Dein Tagebuch</h2>
+            <p class="text-sm mb-4">Sieh dir die Aufzeichnungen der letzten 7 Tage an.</p>
+            <div id="logList">
+                <p class="text-center text-sm">Lade Einträge...</p>
+            </div>
+        </div>
+
+        <!-- Video-Übungen -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4">Übungen</h2>
+            <p class="text-sm mb-4">Wähle deine Symptome, um passende Übungen zu sehen, die dir helfen, deinen Körper zu unterstützen. Denke immer an Pacing, beginne behutsam und höre auf deinen Körper!</p>
+            <div id="exercisesContainer" class="space-y-4"></div>
+        </div>
+
+        <!-- Neue Sektion: Lösungsansätze -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4">Lösungsansätze & Tipps</h2>
+            <p class="text-sm mb-4">Hier sind einige Ansätze, die dir helfen können, deine Symptome zu lindern und deine Lebensqualität zu verbessern.</p>
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2">Pacing & Energiewirtschaft</h3>
+                <p class="text-sm">Das richtige Einteilen deiner Energie ist entscheidend. Plane deine Aktivitäten und Ruhephasen im Voraus, um eine Überanstrengung zu vermeiden. Lerne, auf die Signale deines Körpers zu hören.</p>
+            </div>
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2">Stressmanagement</h3>
+                <p class="text-sm">Chronischer Stress kann Symptome verschlimmern. Techniken wie **Atemübungen, Meditation oder Progressive Muskelentspannung** können helfen, den Körper zu beruhigen und die Schmerzwahrnehmung zu reduzieren.</p>
+            </div>
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2">Schlafhygiene</h3>
+                <p class="text-sm">Guter Schlaf ist essenziell für die Erholung. Achte auf feste Schlafenszeiten, sorge für ein ruhiges Schlafumfeld und vermeide Koffein sowie große Mahlzeiten vor dem Schlafengehen.</p>
+            </div>
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2">Bewegung & Physiotherapie</h3>
+                <p class="text-sm">Sanfte Bewegung, wie sie auch in den Übungen vorgeschlagen wird, ist wichtig. **Tai Chi, Yoga, Schwimmen oder Spazierengehen** können helfen, die Muskulatur zu stärken und Schmerzen zu lindern, ohne den Körper zu überfordern. Auch **Wärmeanwendungen** wie Bäder oder eine Wärmflasche können wohltuend sein.</p>
+            </div>
+        </div>
+
+        <!-- Neue Sektion: Hilfsangebote -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4">Hilfsangebote in deiner Nähe</h2>
+            <p class="text-sm mb-4">Finde Selbsthilfegruppen, Therapiezentren oder Physiotherapeuten, die auf Fibromyalgie spezialisiert sind.</p>
+            <div class="flex items-center gap-2 mb-4">
+                <input type="text" id="plzInput" maxlength="5" placeholder="PLZ eingeben"
+                    class="flex-grow px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow">
+                <button onclick="findHelp()" class="btn btn-primary">Suchen</button>
+            </div>
+            <div id="helpResults" class="hidden">
+                <h3 class="text-lg font-semibold mb-2">Ergebnisse für <span id="plzResult"></span></h3>
+                <ul class="space-y-2 text-sm">
+                    <li><strong class="font-medium">Deutsche Rheuma-Liga e.V.</strong> - Selbsthilfegruppe vor Ort (<a href="#" class="text-blue-500 hover:underline">Link</a>)</li>
+                    <li><strong class="font-medium">Therapiezentrum "Neue Wege"</strong> - Physiotherapie & Schmerztherapie</li>
+                    <li><strong class="font-medium">Praxis Dr. Müller</strong> - Rheumatologie & Schmerztherapie</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal for user messages (replaces alert/confirm) -->
+    <div id="modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl">
+            <div id="modalContent" class="text-center"></div>
+            <div class="flex justify-center mt-4">
+                <button onclick="closeModal()" class="btn btn-secondary">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Global state for symptoms
+        window.dailyData = {
+            symptoms: [],
+            spoons: null,
+        };
+
+        // DOM elements
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modalContent');
+        const exercisesContainer = document.getElementById('exercisesContainer');
+        const symptomCheckboxesContainer = document.getElementById('symptomCheckboxes');
+        const themeToggle = document.getElementById('themeToggle');
+
+        // Initial theme setting based on system preference
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.body.classList.add('dark');
+            themeToggle.textContent = '🌙';
+        } else {
+            document.body.classList.add('light');
+            themeToggle.textContent = '☀️';
+        }
+
+        // Toggles between light and dark mode
+        window.toggleTheme = function() {
+            if (document.body.classList.contains('light')) {
+                document.body.classList.remove('light');
+                document.body.classList.add('dark');
+                themeToggle.textContent = '🌙';
+            } else {
+                document.body.classList.remove('dark');
+                document.body.classList.add('light');
+                themeToggle.textContent = '☀️';
+            }
+        };
+
+        // Shows the custom modal with a message
+        window.showMessage = function(message) {
+            modalContent.innerHTML = `<p>${message}</p>`;
+            modal.classList.remove('hidden');
+        };
+
+        // Hides the custom modal
+        window.closeModal = function() {
+            modal.classList.add('hidden');
+        };
+
+        const ALL_SYMPTOMS = [
+            "Muskel- & Gelenkschmerzen", "Müdigkeit & Erschöpfung (Fatigue)", "Schlechter Schlaf",
+            "Kopfschmerzen & Migräne", "Verdauungsprobleme", "Herzrasen & Atemnot",
+            "Gefühlsstörungen (Kribbeln, Taubheit)", "Überempfindlichkeit (Lärm, Licht, Berührung)",
+            "Konzentrations- & Gedächtnisstörungen", "Emotionaler Stress & Unruhe"
+        ];
+
+        const exercises = [
+            { title: "Sanfter Spaziergang", description: "Leichtes Ausdauertraining, um Schmerzen zu verringern und die Muskulatur zu lockern.", videoUrl: "https://www.youtube.com/watch?v=FjI5jYt7G9I", relatedSymptoms: ["Muskel- & Gelenkschmerzen", "Müdigkeit & Erschöpfung (Fatigue)"] },
+            { title: "Progressive Muskelentspannung", description: "Eine Entspannungsübung, um Stress zu reduzieren und die Anspannung im Körper zu lösen.", videoUrl: "https://www.youtube.com/watch?v=4T1j5-Tf7nE", relatedSymptoms: ["Emotionaler Stress & Unruhe", "Schlechter Schlaf"] },
+            { title: "Tai Chi für Anfänger", description: "Sanfte, fließende Bewegungen, die die Gelenke schonen und die Konzentration fördern.", videoUrl: "https://www.youtube.com/watch?v=yYJ4hT_sJek", relatedSymptoms: ["Muskel- & Gelenkschmerzen", "Konzentrations- & Gedächtnisstörungen"] },
+            { title: "Atemübung gegen Unruhe", description: "Eine einfache Atemtechnik, um das Nervensystem zu beruhigen und Herzrasen zu kontrollieren.", videoUrl: "https://www.youtube.com/watch?v=8fkYm-n3o8k", relatedSymptoms: ["Herzrasen & Atemnot", "Emotionaler Stress & Unruhe"] },
+            { title: "Meditation zur Schmerzlinderung", description: "Fokussiere deinen Geist, um die Schmerzwahrnehmung zu beeinflussen und innere Ruhe zu finden.", videoUrl: "https://www.youtube.com/watch?v=ITwS51qB_2Y", relatedSymptoms: ["Muskel- & Gelenkschmerzen", "Kopfschmerzen & Migräne", "Emotionaler Stress & Unruhe"] }
+        ];
+
+        // Renders the symptom checkboxes dynamically
+        function renderSymptomCheckboxes() {
+            symptomCheckboxesContainer.innerHTML = ALL_SYMPTOMS.map(symptom => `
+                <label class="symptom-checkbox">
+                    <input type="checkbox" class="hidden" onchange="window.toggleSymptom(this, '${symptom}')">
+                    <span>${symptom}</span>
+                </label>
+            `).join('');
+        }
+
+        // Toggles a symptom checkbox and updates the state
+        window.toggleSymptom = function(checkbox, symptom) {
+            const label = checkbox.closest('label');
+            if (checkbox.checked) {
+                window.dailyData.symptoms.push(symptom);
+                label.classList.add('checked');
+            } else {
+                window.dailyData.symptoms = window.dailyData.symptoms.filter(s => s !== symptom);
+                label.classList.remove('checked');
+            }
+            renderExercises();
+        };
+
+        // Renders relevant exercises based on selected symptoms
+        function renderExercises() {
+            const relevantExercises = window.dailyData.symptoms.length > 0 ? exercises.filter(ex =>
+                ex.relatedSymptoms.some(rs => window.dailyData.symptoms.includes(rs))
+            ) : exercises;
+
+            if (relevantExercises.length === 0) {
+                 exercisesContainer.innerHTML = `<p class="text-sm text-center">Wähle Symptome aus, um passende Übungen zu sehen.</p>`;
+                 return;
+            }
+
+            exercisesContainer.innerHTML = relevantExercises.map(ex => `
+                <div class="p-4 border rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between transition-shadow hover:shadow-md">
+                    <div>
+                        <h3 class="font-semibold text-lg">${ex.title}</h3>
+                        <p class="text-sm mt-1">${ex.description}</p>
+                    </div>
+                    <a href="${ex.videoUrl}" target="_blank" class="mt-4 sm:mt-0 btn btn-secondary">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                        </svg>
+                        Video ansehen
+                    </a>
+                </div>
+            `).join('');
+        }
+
+        // Generates insights using the Gemini API
+        window.generateInsights = async function() {
+            const insightsOutput = document.getElementById('insightsOutput');
+            insightsOutput.classList.remove('hidden');
+            insightsOutput.innerHTML = `<p class="text-center">Analysiere deine Daten...</p>`;
+            
+            const userSymptoms = window.dailyData.symptoms.length > 0 ? window.dailyData.symptoms.join(', ') : "keine Symptome aufgezeichnet";
+            const userSpoons = document.getElementById('spoons').value || "keine Löffel aufgezeichnet";
+            
+            if (userSymptoms === "keine Symptome aufgezeichnet" || userSpoons === "keine Löffel aufgezeichnet") {
+                insightsOutput.innerHTML = '<p class="text-center">Bitte speichere zuerst deine Symptome und deinen Löffelverbrauch, um Einblicke zu erhalten.</p>';
+                return;
+            }
+
+            const systemPrompt = `Du bist ein KI-gesteuerter Gesundheitsbegleiter, der Menschen mit Fibromyalgie unterstützt. Dein Ziel ist es, eine kurze, motivierende und verständliche Zusammenfassung des Tages zu geben. Analysiere die folgenden Daten:
+            - Aufgezeichnete Symptome: ${userSymptoms}
+            - Verbrauchte Löffel am Tag: ${userSpoons}
+            Gib eine Zusammenfassung, die die Zusammenhänge zwischen den Symptomen und dem Energieverbrauch (Löffeln) hervorhebt. Gib keine medizinischen Ratschläge. Beende deine Antwort mit einem kurzen, motivierenden Satz, der den Nutzer ermutigt, weiterzumachen.`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: systemPrompt }] }],
+                tools: [{ "google_search": {} }],
+            };
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text || "Konnte keine Einblicke generieren. Bitte versuche es später noch einmal.";
+                insightsOutput.innerHTML = `<p class="font-medium">${generatedText}</p>`;
+            } catch (error) {
+                console.error("Fehler bei der KI-Analyse:", error);
+                insightsOutput.innerHTML = '<p class="text-center">Ein Fehler ist aufgetreten. Bitte versuche es später noch einmal.</p>';
+            }
+        };
+
+        // Finds help based on a mock postcode
+        window.findHelp = function() {
+            const plzInput = document.getElementById('plzInput').value;
+            const helpResults = document.getElementById('helpResults');
+            const plzResult = document.getElementById('plzResult');
+            const plzRegex = /^\d{5}$/;
+
+            if (plzRegex.test(plzInput)) {
+                plzResult.textContent = plzInput;
+                helpResults.classList.remove('hidden');
+            } else {
+                window.showMessage("Bitte gib eine gültige 5-stellige Postleitzahl ein.");
+                helpResults.classList.add('hidden');
+            }
+        };
+
+        // Initialize functions on page load
+        window.onload = function() {
+            window.initializeFirebase();
+            renderSymptomCheckboxes();
+            renderExercises();
+        };
+    </script>
+</body>
+</html>
